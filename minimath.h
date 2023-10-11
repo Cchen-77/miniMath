@@ -4,6 +4,9 @@
 #include<iostream>
 #include<cmath>
 namespace miniMath{
+    typedef double Real;
+}
+namespace miniMath{
     double calcRoot(double x,int t);
 }
 namespace miniMath{
@@ -16,22 +19,22 @@ namespace miniMath{
         Matrix(const Matrix& rhs);
         ~Matrix();
     public:
-        float& at(uint32_t i,uint32_t j);
-        float at(uint32_t i,uint32_t j) const;
+        Real& at(uint32_t i,uint32_t j);
+        Real at(uint32_t i,uint32_t j) const;
         Matrix operator+(const Matrix& rhs) const;
         Matrix operator-() const;
         Matrix operator-(const Matrix& rhs) const;
         Matrix operator*(const Matrix& rhs) const;
         Matrix& operator=(const Matrix& rhs);
-        MatrixInitializer operator<<(float item);
+        MatrixInitializer operator<<(Real item);
 
     private:
-        float* items;
+        Real* items;
     };
     class Vector:public Matrix{
     public:
         Vector(uint32_t dim);
-        float& at(uint32_t i);
+        Real& at(uint32_t i);
     };
 
     class MatrixInitializer{
@@ -41,19 +44,19 @@ namespace miniMath{
         Matrix& matrix;
         uint32_t index;
     public:
-        MatrixInitializer operator,(float item);
+        MatrixInitializer operator,(Real item);
     };
 
     std::ostream& operator<<(std::ostream& os,Matrix& mat);
 }
 namespace miniMath{
     void LUSplit(const Matrix& mat,Matrix& L,Matrix& U);
-    float det(const Matrix& mat);
+    Real det(const Matrix& mat);
     Matrix inverse(const Matrix& mat);
 
     Vector JacobiSolve(const Matrix& A,const Vector& b,bool printInfo=false);
     Vector GSSolve(const Matrix& A,const Vector& b,bool printInfo=false);
-    Vector SORSolve(const Matrix& A,const Vector& b,float omega,bool printInfo=false);
+    Vector SORSolve(const Matrix& A,const Vector& b,Real omega,bool printInfo=false);
     Vector GESolve(const Matrix& A,const Vector& b,bool printInfo=false);
     Vector LUSolve(const Matrix& A,const Vector& b,bool printInfo=false);
     
@@ -94,14 +97,14 @@ namespace miniMath{
     Matrix::Matrix(uint32_t dim_0,uint32_t dim_1){
         this->dim_0 = dim_0;
         this->dim_1 = dim_1;
-        items = new float[dim_0*dim_1];
-        memset(items,0,sizeof(float)*dim_0*dim_1);
+        items = new Real[dim_0*dim_1];
+        memset(items,0,sizeof(Real)*dim_0*dim_1);
     }
     Matrix::Matrix(const Matrix& rhs){
         dim_0 = rhs.dim_0;
         dim_1 = rhs.dim_1;
-        items = new float[dim_0*dim_1];
-        memset(items,0,sizeof(float)*dim_0*dim_1);
+        items = new Real[dim_0*dim_1];
+        memset(items,0,sizeof(Real)*dim_0*dim_1);
         for(uint32_t i=0;i<dim_0;++i){
             for(uint32_t j=0;j<dim_1;++j){
                 at(i,j) = rhs.at(i,j);
@@ -111,14 +114,14 @@ namespace miniMath{
     Matrix::~Matrix(){
         delete items;
     }
-    float& Matrix::at(uint32_t i,uint32_t j){
+    Real& Matrix::at(uint32_t i,uint32_t j){
         if(i>=dim_0 || j>=dim_1){
             throw std::runtime_error("bad index!");
         }
         return items[i*dim_1+j];
 
     }
-    float Matrix::at(uint32_t i, uint32_t j) const
+    Real Matrix::at(uint32_t i, uint32_t j) const
     {
         if(i>=dim_0 || j>=dim_1){
             throw std::runtime_error("bad index!");
@@ -175,8 +178,8 @@ namespace miniMath{
         delete items;
         dim_0 = rhs.dim_0;
         dim_1 = rhs.dim_1;
-        items = new float[dim_0*dim_1];
-        memset(items,0,sizeof(float)*dim_0*dim_1);
+        items = new Real[dim_0*dim_1];
+        memset(items,0,sizeof(Real)*dim_0*dim_1);
         for(uint32_t i=0;i<dim_0;++i){
             for(uint32_t j=0;j<dim_1;++j){
                 at(i,j) = rhs.at(i,j);
@@ -185,7 +188,7 @@ namespace miniMath{
         return *this;
     }
 
-    MatrixInitializer Matrix::operator<<(float item)
+    MatrixInitializer Matrix::operator<<(Real item)
     {
         items[0] = item;
         return MatrixInitializer(*this,1);
@@ -195,7 +198,7 @@ namespace miniMath{
 
     }
 
-    float &Vector::at(uint32_t i)
+    Real &Vector::at(uint32_t i)
     {
         return Matrix::at(i,0);
     }
@@ -213,7 +216,7 @@ namespace miniMath{
     MatrixInitializer::MatrixInitializer(Matrix& mat,uint32_t idx):matrix(mat),index(idx){
 
     }
-    MatrixInitializer MatrixInitializer::operator,(float item)
+    MatrixInitializer MatrixInitializer::operator,(Real item)
     {
         if(index >= matrix.dim_0*matrix.dim_1){
             throw std::runtime_error("fail to do matrix(vector) comma init!");
@@ -227,7 +230,7 @@ namespace miniMath{
     void LUSplit(const Matrix& mat,Matrix& L,Matrix& U){
         return;
     }
-    float det(const Matrix& mat){
+    Real det(const Matrix& mat){
         return 0.0f;
     }
     Matrix inverse(const Matrix& mat){
@@ -240,7 +243,7 @@ namespace miniMath{
     Vector GSSolve(const Matrix& A,const Vector& b,bool printInfo){
         return b;
     }
-    Vector SORSolve(const Matrix& A,const Vector& b,float omega,bool printInfo){
+    Vector SORSolve(const Matrix& A,const Vector& b,Real omega,bool printInfo){
         return b;
     }
     Vector GESolve(const Matrix& A,const Vector& b,bool printInfo){
@@ -259,7 +262,7 @@ namespace miniMath{
         memset(row_picked,0,sizeof(row_picked));
         std::vector<uint32_t> picked_rows;
 
-        float pivot = std::abs(tempA.at(0,0));
+        Real pivot = std::abs(tempA.at(0,0));
         uint32_t pivot_row = 0;
 
         for(uint32_t i=1;i<numRows;++i){
@@ -278,7 +281,7 @@ namespace miniMath{
             uint32_t pivot_column = picked_rows.size()-1;
             for(uint32_t row=0;row<numRows;++row){
                 if(!row_picked[row]){
-                    float scale = tempA.at(row,pivot_column)/pivot;
+                    Real scale = tempA.at(row,pivot_column)/pivot;
                     tempA.at(row,pivot_column) = 0;
                     
                     for(uint32_t column=pivot_column+1;column<numColumns;++column){
@@ -302,7 +305,7 @@ namespace miniMath{
         }
         Vector solution(tempb.dim_0);
         for(int row=numRows-1;row>=0;--row){
-            float solution_temp = tempb.at(picked_rows[row]);
+            Real solution_temp = tempb.at(picked_rows[row]);
             for(int column = numColumns -1;column>row;--column){
                 solution_temp -= tempA.at(picked_rows[row],column)*solution.at(picked_rows[column]);
             }
