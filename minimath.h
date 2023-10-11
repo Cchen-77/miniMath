@@ -31,6 +31,7 @@ namespace miniMath{
     class Vector:public Matrix{
     public:
         Vector(uint32_t dim);
+        float& at(uint32_t i);
     };
 
     class MatrixInitializer{
@@ -194,6 +195,11 @@ namespace miniMath{
 
     }
 
+    float &Vector::at(uint32_t i)
+    {
+        return Matrix::at(i,0);
+    }
+
     std::ostream& operator<<(std::ostream& os,Matrix& mat){
         for(uint32_t i=0;i<mat.dim_0;++i){
             for(uint32_t j=0;j<mat.dim_1;++j){
@@ -238,7 +244,72 @@ namespace miniMath{
         return b;
     }
     Vector GESolve(const Matrix& A,const Vector& b,bool printInfo){
-        return b;
+        if(A.dim_0!=A.dim_1 || A.dim_0 != b.dim_0){
+            throw std::runtime_error("bad matrix A and bad vector b!");
+        }
+        if(A.dim_0>100){
+            throw std::runtime_error("matrix too big!");
+        }
+        uint32_t numRows = A.dim_0;
+        uint32_t numColumns = A.dim_1;
+        Matrix tempA = A;
+        Vector tempb = b;
+
+        int row_picked[101];
+        memset(row_picked,0,sizeof(row_picked));
+        std::vector<uint32_t> picked_rows;
+
+        float pivot = std::abs(tempA.at(0,0));
+        uint32_t pivot_row = 0;
+
+        for(uint32_t i=1;i<numRows;++i){
+            if(std::abs(tempA.at(i,0)) > pivot){
+                pivot = std::abs(tempA.at(i,0));
+                pivot_row = i;
+            }
+        }
+
+        picked_rows.push_back(pivot_row);
+        row_picked[pivot_row] = 1;
+        while(picked_rows.size() < numRows){
+            if(pivot == 0){
+                throw std::runtime_error("Bad matrix with more than one solution!");
+            }
+            uint32_t pivot_column = picked_rows.size()-1;
+            for(uint32_t row=0;row<numRows;++row){
+                if(!row_picked[row]){
+                    float scale = tempA.at(row,pivot_column)/pivot;
+                    tempA.at(row,pivot_column) = 0;
+                    
+                    for(uint32_t column=pivot_column+1;column<numColumns;++column){
+                        tempA.at(row,column) -= scale*tempA.at(pivot_row,column);
+                    }
+                    tempb.at(row) -= scale*tempb.at(pivot_row);
+                }
+            }
+            pivot = 0;
+            for(uint32_t row=0;row<numRows;++row){
+                if(!row_picked[row]&&std::abs(tempA.at(row,pivot_column+1)) > pivot){
+                    pivot = std::abs(tempA.at(row,pivot_column+1));
+                    pivot_row = row;
+                }
+            }
+            picked_rows.push_back(pivot_row);
+            row_picked[pivot_row] = 1;
+        }
+        if(pivot == 0){
+            throw std::runtime_error("Bad matrix with more than one solution!");
+        }
+        Vector solution(tempb.dim_0);
+        for(int row=numRows-1;row>=0;--row){
+            float solution_temp = tempb.at(picked_rows[row]);
+            for(int column = numColumns -1;column>row;--column){
+                solution_temp -= tempA.at(picked_rows[row],column)*solution.at(picked_rows[column]);
+            }
+            solution_temp /= tempA.at(picked_rows[row],row);
+            solution.at(picked_rows[row]) = solution_temp;
+        }
+        return solution;
     }
     Vector LUSolve(const Matrix& A,const Vector& b,bool printInfo){
         return b;
