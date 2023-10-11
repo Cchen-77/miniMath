@@ -46,7 +46,7 @@ namespace miniMath{
     std::ostream& operator<<(std::ostream& os,Matrix& mat);
 }
 namespace miniMath{
-    bool LUSplit(const Matrix& mat,Matrix& L,Matrix& U);
+    void LUSplit(const Matrix& mat,Matrix& L,Matrix& U);
     float det(const Matrix& mat);
     Matrix inverse(const Matrix& mat);
 
@@ -214,6 +214,41 @@ namespace miniMath{
         }
         matrix.items[index] = item;       
         return MatrixInitializer(matrix,index+1);
+    }
+}
+
+namespace miniMath{
+    void LUSplit(const Matrix& mat,Matrix& L,Matrix& U){
+        return;
+    }
+    float det(const Matrix& mat){
+        return 0.0f;
+    }
+    Matrix inverse(const Matrix& mat){
+        return mat;
+    }
+
+    Vector JacobiSolve(const Matrix& A,const Vector& b,bool printInfo){
+        return b;
+    }
+    Vector GSSolve(const Matrix& A,const Vector& b,bool printInfo){
+        return b;
+    }
+    Vector SORSolve(const Matrix& A,const Vector& b,float omega,bool printInfo){
+        return b;
+    }
+    Vector GESolve(const Matrix& A,const Vector& b,bool printInfo){
+        return b;
+    }
+    Vector LUSolve(const Matrix& A,const Vector& b,bool printInfo){
+        return b;
+    }
+    
+    Vector LSolve(const Matrix& A,const Vector& b){
+        return b;
+    }
+    Vector USovle(const Matrix& A,const Vector& b){
+        return b;
     }
 }
 #endif
