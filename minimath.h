@@ -7,7 +7,7 @@ namespace miniMath{
     typedef double Real;
 }
 namespace miniMath{
-    double calcRoot(double x,int t);
+    Real calcRoot(Real x,int t);
 }
 namespace miniMath{
     class MatrixInitializer;
@@ -15,6 +15,7 @@ namespace miniMath{
         friend class MatrixInitializer;
     public:
         uint32_t dim_0,dim_1;
+        Matrix();
         Matrix(uint32_t dim_0,uint32_t dim_1);
         Matrix(const Matrix& rhs);
         ~Matrix();
@@ -27,13 +28,20 @@ namespace miniMath{
         Matrix operator*(const Matrix& rhs) const;
         Matrix& operator=(const Matrix& rhs);
         MatrixInitializer operator<<(Real item);
-
+    public:
+        void swapRow(uint32_t r1,uint32_t r2);
+    public:
+        static Matrix I(uint32_t dim);
     private:
         Real* items;
     };
     class Vector:public Matrix{
     public:
+        Vector();
         Vector(uint32_t dim);
+        Vector(const Matrix& matrix);
+    public:
+        using Matrix::at;
         Real& at(uint32_t i);
     };
 
@@ -50,7 +58,7 @@ namespace miniMath{
     std::ostream& operator<<(std::ostream& os,Matrix& mat);
 }
 namespace miniMath{
-    void LUSplit(const Matrix& mat,Matrix& L,Matrix& U);
+    void LUSplit(const Matrix& mat,Matrix& L,Matrix& U,Matrix& P,Matrix& invP);
     Real det(const Matrix& mat);
     Matrix inverse(const Matrix& mat);
 
@@ -59,9 +67,7 @@ namespace miniMath{
     Vector SORSolve(const Matrix& A,const Vector& b,Real omega,bool printInfo=false);
     Vector GESolve(const Matrix& A,const Vector& b,bool printInfo=false);
     Vector LUSolve(const Matrix& A,const Vector& b,bool printInfo=false);
-    
-    Vector LSolve(const Matrix& A,const Vector& b);
-    Vector USovle(const Matrix& A,const Vector& b);
+
 }
 #endif
 #define MINIMATH_IMPLEMENTATION
@@ -69,11 +75,11 @@ namespace miniMath{
 namespace miniMath{
 
     //HelperFuncs Implementation
-    double calcRoot(double x,int t){
+    Real calcRoot(Real x,int t){
         if(x<0&&t%2==0){
             throw std::runtime_error("bad input!");
         }
-        double low,high=1e9;
+        Real low,high=1e9;
         if(t%2==0){
             low = 0;
         }
@@ -81,7 +87,7 @@ namespace miniMath{
             low = -1e9;
         }
         while(high-low >= 1e-10){ 
-            double mid = (low+high)/2;
+            Real mid = (low+high)/2;
             if(std::pow(mid,t)>x){
                 high = mid;
             }
@@ -94,6 +100,11 @@ namespace miniMath{
 }
 
 namespace miniMath{
+    Matrix::Matrix():dim_0(0),dim_1(0),items(nullptr)
+    {
+
+    }
+
     Matrix::Matrix(uint32_t dim_0,uint32_t dim_1){
         this->dim_0 = dim_0;
         this->dim_1 = dim_1;
@@ -194,8 +205,36 @@ namespace miniMath{
         return MatrixInitializer(*this,1);
     }
 
-    Vector::Vector(uint32_t dim):Matrix(dim,1){
+    void Matrix::swapRow(uint32_t r1, uint32_t r2)
+    {
+        for(uint32_t c=0;c<dim_1;++c){
+            std::swap(at(r1,c),at(r2,c));
+        }
+    }
 
+    Matrix Matrix::I(uint32_t dim)
+    {
+        Matrix matI = Matrix(dim,dim);
+        for(uint32_t i=0;i<dim;++i)
+            matI.at(i,i) = 1;
+        return matI;
+    }
+
+    Vector::Vector():Matrix()
+    {
+
+    }
+
+    Vector::Vector(uint32_t dim) : Matrix(dim, 1)
+    {
+    }
+
+    Vector::Vector(const Matrix &matrix):Matrix(matrix)
+    {
+        if(matrix.dim_1 != 1){
+            throw std::runtime_error("bad vector init with matrix!");
+        }
+        
     }
 
     Real &Vector::at(uint32_t i)
@@ -227,8 +266,72 @@ namespace miniMath{
 }
 
 namespace miniMath{
-    void LUSplit(const Matrix& mat,Matrix& L,Matrix& U){
-        return;
+    void LUSplit(const Matrix& mat,Matrix& L,Matrix& U,Matrix& P,Matrix& invP){
+         if(mat.dim_0!=mat.dim_1){
+            throw std::runtime_error("bad matrix A or bad vector b!");
+        }
+        if(mat.dim_0>100){
+            throw std::runtime_error("matrix too big!");
+        }
+        uint32_t numRows = mat.dim_0;
+        uint32_t numColumns = mat.dim_1;
+
+        Matrix tempMat = mat;
+        L = Matrix::I(numRows);
+        P = Matrix::I(numRows);
+        invP = Matrix::I(numRows);
+        uint32_t finishrow_count = 0;
+
+        Real pivot = std::abs(tempMat.at(0,0));
+        uint32_t pivot_row = 0;
+        Matrix invPk = Matrix::I(numRows);
+        for(uint32_t i=1;i<numRows;++i){
+            if(std::abs(tempMat.at(i,0)) > pivot){
+                pivot = std::abs(tempMat.at(i,0));
+                pivot_row = i;
+            }
+        }
+        tempMat.swapRow(pivot_row,finishrow_count);
+        invPk.swapRow(pivot_row,finishrow_count);
+        invP = invPk*invP;
+        P = P*invPk;
+        ++finishrow_count;
+    
+        while(finishrow_count < numRows){
+            if(pivot == 0){
+                throw std::runtime_error("Bad matrix with more than one solution!");
+            }
+            Matrix Lk = Matrix::I(numRows);
+            uint32_t pivot_column = finishrow_count-1;
+            for(uint32_t row=finishrow_count;row<numRows;++row){
+                Real scale = tempMat.at(row,pivot_column)/pivot;
+                Lk.at(row,pivot_column) += scale;
+                tempMat.at(row,pivot_column) = 0;
+                for(uint32_t column=pivot_column+1;column<numColumns;++column){
+                    tempMat.at(row,column) -= scale*tempMat.at(pivot_row,column);
+                }
+            }
+            L = L*Lk;
+            Matrix invPk = Matrix::I(numRows);
+            pivot = 0;
+            for(uint32_t row=finishrow_count;row<numRows;++row){
+                if(std::abs(tempMat.at(row,pivot_column+1)) > pivot){
+                    pivot = std::abs(tempMat.at(row,pivot_column+1));
+                    pivot_row = row;
+                }
+            }
+            tempMat.swapRow(pivot_row,finishrow_count);
+            invPk.swapRow(pivot_row,finishrow_count);
+            invP = invPk*invP;
+            P = P*invPk;
+            ++finishrow_count;
+        }
+        if(pivot == 0){
+            throw std::runtime_error("Bad matrix could not be LU splited!");
+        }
+
+        U = tempMat;
+       
     }
     Real det(const Matrix& mat){
         return 0.0f;
@@ -248,7 +351,7 @@ namespace miniMath{
     }
     Vector GESolve(const Matrix& A,const Vector& b,bool printInfo){
         if(A.dim_0!=A.dim_1 || A.dim_0 != b.dim_0){
-            throw std::runtime_error("bad matrix A and bad vector b!");
+            throw std::runtime_error("bad matrix A or bad vector b!");
         }
         if(A.dim_0>100){
             throw std::runtime_error("matrix too big!");
@@ -258,9 +361,7 @@ namespace miniMath{
         Matrix tempA = A;
         Vector tempb = b;
 
-        int row_picked[101];
-        memset(row_picked,0,sizeof(row_picked));
-        std::vector<uint32_t> picked_rows;
+        uint32_t finishrow_count = 0;
 
         Real pivot = std::abs(tempA.at(0,0));
         uint32_t pivot_row = 0;
@@ -271,58 +372,92 @@ namespace miniMath{
                 pivot_row = i;
             }
         }
-
-        picked_rows.push_back(pivot_row);
-        row_picked[pivot_row] = 1;
-        while(picked_rows.size() < numRows){
+        tempA.swapRow(pivot_row,finishrow_count);
+        tempb.swapRow(pivot_row,finishrow_count);
+        ++finishrow_count;
+   
+        while(finishrow_count < numRows){
             if(pivot == 0){
                 throw std::runtime_error("Bad matrix with more than one solution!");
             }
-            uint32_t pivot_column = picked_rows.size()-1;
-            for(uint32_t row=0;row<numRows;++row){
-                if(!row_picked[row]){
-                    Real scale = tempA.at(row,pivot_column)/pivot;
-                    tempA.at(row,pivot_column) = 0;
-                    
-                    for(uint32_t column=pivot_column+1;column<numColumns;++column){
-                        tempA.at(row,column) -= scale*tempA.at(pivot_row,column);
-                    }
-                    tempb.at(row) -= scale*tempb.at(pivot_row);
+            uint32_t pivot_column = finishrow_count-1;
+            for(uint32_t row=finishrow_count;row<numRows;++row){
+               
+                Real scale = tempA.at(row,pivot_column)/pivot;
+                tempA.at(row,pivot_column) = 0;
+                for(uint32_t column=pivot_column+1;column<numColumns;++column){
+                    tempA.at(row,column) -= scale*tempA.at(pivot_row,column);
                 }
+                tempb.at(row) -= scale*tempb.at(pivot_row);
+
             }
             pivot = 0;
-            for(uint32_t row=0;row<numRows;++row){
-                if(!row_picked[row]&&std::abs(tempA.at(row,pivot_column+1)) > pivot){
+            for(uint32_t row=finishrow_count;row<numRows;++row){
+                if(std::abs(tempA.at(row,pivot_column+1)) > pivot){
                     pivot = std::abs(tempA.at(row,pivot_column+1));
                     pivot_row = row;
                 }
             }
-            picked_rows.push_back(pivot_row);
-            row_picked[pivot_row] = 1;
+            tempA.swapRow(pivot_row,finishrow_count);
+            tempb.swapRow(pivot_row,finishrow_count);
+            ++finishrow_count;
         }
         if(pivot == 0){
             throw std::runtime_error("Bad matrix with more than one solution!");
         }
         Vector solution(tempb.dim_0);
         for(int row=numRows-1;row>=0;--row){
-            Real solution_temp = tempb.at(picked_rows[row]);
+            Real solution_temp = tempb.at(row);
             for(int column = numColumns -1;column>row;--column){
-                solution_temp -= tempA.at(picked_rows[row],column)*solution.at(picked_rows[column]);
+                solution_temp -= tempA.at(row,column)*solution.at(column);
             }
-            solution_temp /= tempA.at(picked_rows[row],row);
-            solution.at(picked_rows[row]) = solution_temp;
+            solution_temp /= tempA.at(row,row);
+            solution.at(row) = solution_temp;
         }
         return solution;
     }
     Vector LUSolve(const Matrix& A,const Vector& b,bool printInfo){
-        return b;
+        if(A.dim_0!=A.dim_1 || A.dim_0 != b.dim_0){
+            throw std::runtime_error("bad matrix A or bad vector b!");
+        }
+        if(A.dim_0>100){
+            throw std::runtime_error("matrix too big!");
+        }
+        Matrix L,U,P,invP;
+        LUSplit(A,L,U,P,invP);
+        if(printInfo){
+            printf("===========infos===============\n");
+            printf("L Matrix(%dx%d):\n",L.dim_0,L.dim_1);
+            std::cout<<L;
+            printf("U Matrix(%dx%d):\n",U.dim_0,U.dim_1);
+            std::cout<<U;
+            printf("invP Matrix(%dx%d):\n",invP.dim_0,invP.dim_1);
+            std::cout<<invP;
+            printf("===============================\n");
+        }
+        Vector tempb = invP*b;
+        uint32_t numRows = A.dim_0;
+        uint32_t numColumns = A.dim_1;
+        Vector solution_u(numRows);
+        for(uint32_t row=0;row<numRows;++row){
+            Real t = tempb.at(row);
+            for(uint32_t column=0;column<row;++column){
+                t-=L.at(row,column)*solution_u.at(column);
+            }
+            t/=L.at(row,row);
+            solution_u.at(row) = t;
+        }
+        Vector solution(numRows);
+        for(int row=numRows-1;row>=0;--row){
+            Real solution_temp = solution_u.at(row);
+            for(int column = numColumns -1;column>row;--column){
+                solution_temp -= U.at(row,column)*solution.at(column);
+            }
+            solution_temp /= U.at(row,row);
+            solution.at(row) = solution_temp;
+        }
+        return P*solution;
     }
     
-    Vector LSolve(const Matrix& A,const Vector& b){
-        return b;
-    }
-    Vector USovle(const Matrix& A,const Vector& b){
-        return b;
-    }
 }
 #endif
