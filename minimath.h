@@ -7,9 +7,6 @@ namespace miniMath{
     typedef double Real;
 }
 namespace miniMath{
-    Real calcRoot(Real x,int t);
-}
-namespace miniMath{
     class MatrixInitializer;
     class Matrix{
         friend class MatrixInitializer;
@@ -43,6 +40,7 @@ namespace miniMath{
     public:
         using Matrix::at;
         Real& at(uint32_t i);
+        Real at(uint32_t i) const;
     };
 
     class MatrixInitializer{
@@ -57,11 +55,13 @@ namespace miniMath{
 
     std::ostream& operator<<(std::ostream& os,Matrix& mat);
 }
+//tier2 operators
+namespace miniMath{
+    Real length(const Vector& vector);
+}
+//Solvers:
 namespace miniMath{
     void LUSplit(const Matrix& mat,Matrix& L,Matrix& U,Matrix& P,Matrix& invP);
-    Real det(const Matrix& mat);
-    Matrix inverse(const Matrix& mat);
-
     Vector JacobiSolve(const Matrix& A,const Vector& b,bool printInfo=false);
     Vector GSSolve(const Matrix& A,const Vector& b,bool printInfo=false);
     Vector SORSolve(const Matrix& A,const Vector& b,Real omega,bool printInfo=false);
@@ -70,35 +70,9 @@ namespace miniMath{
 
 }
 #endif
-#define MINIMATH_IMPLEMENTATION
+
+
 #ifdef MINIMATH_IMPLEMENTATION
-namespace miniMath{
-
-    //HelperFuncs Implementation
-    Real calcRoot(Real x,int t){
-        if(x<0&&t%2==0){
-            throw std::runtime_error("bad input!");
-        }
-        Real low,high=1e9;
-        if(t%2==0){
-            low = 0;
-        }
-        else{
-            low = -1e9;
-        }
-        while(high-low >= 1e-10){ 
-            Real mid = (low+high)/2;
-            if(std::pow(mid,t)>x){
-                high = mid;
-            }
-            else{
-                low = mid;
-            }
-        }
-        return low;
-    }
-}
-
 namespace miniMath{
     Matrix::Matrix():dim_0(0),dim_1(0),items(nullptr)
     {
@@ -236,13 +210,16 @@ namespace miniMath{
         }
         
     }
-
     Real &Vector::at(uint32_t i)
     {
         return Matrix::at(i,0);
     }
-
-    std::ostream& operator<<(std::ostream& os,Matrix& mat){
+    Real Vector::at(uint32_t i) const
+    {
+        return Matrix::at(i,0);
+    }
+    std::ostream &operator<<(std::ostream &os, Matrix &mat)
+    {
         for(uint32_t i=0;i<mat.dim_0;++i){
             for(uint32_t j=0;j<mat.dim_1;++j){
                 os<<mat.at(i,j)<<",";
@@ -264,10 +241,21 @@ namespace miniMath{
         return MatrixInitializer(matrix,index+1);
     }
 }
-
+namespace miniMath{
+    Real length(const Vector& vector){
+        if(vector.dim_1!=1){
+            throw std::runtime_error("bad vector:maybe you should not give a matrix!");
+        }
+        Real len = 0;
+        for(uint32_t i=0;i<vector.dim_0;++i){
+            len += vector.at(i)*vector.at(i);
+        }
+        return sqrt(len);
+    }
+}
 namespace miniMath{
     void LUSplit(const Matrix& mat,Matrix& L,Matrix& U,Matrix& P,Matrix& invP){
-         if(mat.dim_0!=mat.dim_1){
+        if(mat.dim_0!=mat.dim_1){
             throw std::runtime_error("bad matrix A or bad vector b!");
         }
         if(mat.dim_0>100){
@@ -333,21 +321,116 @@ namespace miniMath{
         U = tempMat;
        
     }
-    Real det(const Matrix& mat){
-        return 0.0f;
-    }
-    Matrix inverse(const Matrix& mat){
-        return mat;
-    }
 
     Vector JacobiSolve(const Matrix& A,const Vector& b,bool printInfo){
-        return b;
+        //you should init A for aii !=0
+        if(A.dim_0!=A.dim_1 || b.dim_0 != A.dim_0){
+            throw std::runtime_error("bad matrix A or bad vector b!");
+        }
+        uint32_t numRows = A.dim_0;
+        uint32_t numColumns = A.dim_1;
+        Vector x[2];
+        uint32_t curframe = 0;
+        for(uint32_t i=0;i<2;++i){
+            x[i] = Vector(numRows);
+        }
+        uint32_t lastframe;
+        uint32_t iter=0;
+        do{
+            if(printInfo){
+                printf("iteration %d:\n",iter++);
+                std::cout<<x[curframe];
+            }
+            lastframe = curframe;
+            curframe^=1;
+            for(uint32_t row=0;row<numRows;++row){
+                Real t = b.at(row);
+                for(uint32_t column=0;column<numColumns;++column){
+                    if(column != row){
+                        t -= x[lastframe].at(column)*A.at(row,column);
+                    }
+                }
+                x[curframe].at(row) = t/A.at(row,row);
+            }
+        }while(length(x[curframe]-x[lastframe])>5e-5);
+        if(printInfo){
+            printf("total iter:%d\n",iter);
+        }
+        return x[curframe];
     }
     Vector GSSolve(const Matrix& A,const Vector& b,bool printInfo){
-        return b;
+        //you should init A for aii !=0
+        if(A.dim_0!=A.dim_1 || b.dim_0 != A.dim_0){
+            throw std::runtime_error("bad matrix A or bad vector b!");
+        }
+        uint32_t numRows = A.dim_0;
+        uint32_t numColumns = A.dim_1;
+        Vector x[2];
+        uint32_t curframe = 0;
+        for(uint32_t i=0;i<2;++i){
+            x[i] = Vector(numRows);
+        }
+        uint32_t lastframe;
+        uint32_t iter=0;
+        do{
+            if(printInfo){
+                printf("iteration %d:\n",iter++);
+                std::cout<<x[curframe];
+            }
+            lastframe = curframe;
+            curframe^=1;
+            for(uint32_t row=0;row<numRows;++row){
+                Real t = b.at(row);
+                for(uint32_t column=0;column<row;++column){
+                    t -= x[curframe].at(column)*A.at(row,column);
+                }
+                for(uint32_t column=row+1;column<numRows;++column){
+                    t -= x[lastframe].at(column)*A.at(row,column);
+                }
+                x[curframe].at(row) = t/A.at(row,row);
+            }
+        }while(length(x[curframe]-x[lastframe])>5e-5);
+        if(printInfo){
+            printf("total iter:%d\n",iter);
+        }
+        return x[curframe];
     }
     Vector SORSolve(const Matrix& A,const Vector& b,Real omega,bool printInfo){
-        return b;
+        //you should init A for aii !=0
+        if(A.dim_0!=A.dim_1 || b.dim_0 != A.dim_0){
+            throw std::runtime_error("bad matrix A or bad vector b!");
+        }
+        uint32_t numRows = A.dim_0;
+        uint32_t numColumns = A.dim_1;
+        Vector x[2];
+        uint32_t curframe = 0;
+        for(uint32_t i=0;i<2;++i){
+            x[i] = Vector(numRows);
+        }
+        uint32_t lastframe;
+        uint32_t iter=0;
+        do{
+            if(printInfo){
+                printf("iteration %d:\n",iter++);
+                std::cout<<x[curframe];
+            }
+            lastframe = curframe;
+            curframe^=1;
+            for(uint32_t row=0;row<numRows;++row){
+                Real t = b.at(row);
+                for(uint32_t column=0;column<row;++column){
+                    t -= x[curframe].at(column)*A.at(row,column);
+                }
+                for(uint32_t column=row+1;column<numRows;++column){
+                    t -= x[lastframe].at(column)*A.at(row,column);
+                }
+                x[curframe].at(row) = omega*t/A.at(row,row) + (1-omega)*x[lastframe].at(row);
+            }
+        }while(length(x[curframe]-x[lastframe])>5e-5);
+        if(printInfo){
+            printf("total iter:%d\n",iter);
+        }
+        return x[curframe];
     }
     Vector GESolve(const Matrix& A,const Vector& b,bool printInfo){
         if(A.dim_0!=A.dim_1 || A.dim_0 != b.dim_0){
