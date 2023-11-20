@@ -69,6 +69,29 @@ namespace miniMath{
     Vector LUSolve(const Matrix& A,const Vector& b,bool printInfo=false);
 
 }
+namespace miniMath{
+    class Polynomial{
+    public:
+        Polynomial();
+        Polynomial(const Polynomial& other);
+        Polynomial(std::initializer_list<Real> list);
+    public:
+        Polynomial operator+(const Polynomial& rhs) const;
+        Polynomial operator*(const Polynomial& rhs) const;
+        Polynomial operator*(Real rhs) const;
+        Polynomial& operator=(const Polynomial& rhs);
+        std::vector<Real> coeffs;
+    public:
+        void printCoeffs();
+    };
+    std::ostream& operator<<(std::ostream& os,const Polynomial& p);
+    Polynomial operator*(Real lambda,const Polynomial& p);
+}
+//interpolation
+namespace miniMath{
+    Polynomial LagrangeInterpolation(std::vector<Real>& xi,std::vector<Real>& yi);
+    std::vector<Polynomial> CubeSplineInterpolation(std::vector<Real>& xi,std::vector<Real>& yi);
+}
 #endif
 
 
@@ -541,6 +564,183 @@ namespace miniMath{
         }
         return P*solution;
     }
-    
+}
+namespace miniMath{
+    Polynomial::Polynomial(){
+        
+    }
+    Polynomial::Polynomial(const Polynomial &other)
+    {
+        coeffs.resize(other.coeffs.size());
+        for(int i=0;i<coeffs.size();++i){
+            coeffs[i] = other.coeffs[i];
+        }
+    }
+    Polynomial::Polynomial(std::initializer_list<Real> list)
+    {
+        if(list.begin()==list.end()){
+            throw std::runtime_error("empty polynomial is not allowed!plz use polynomial()");
+        }
+        for(auto it = list.begin();it!=list.end();++it){
+            coeffs.push_back(*it);
+        }
+    }
+    Polynomial Polynomial::operator+(const Polynomial& rhs) const{
+        int maxSize = std::max(coeffs.size(),rhs.coeffs.size());
+        Polynomial result;
+        for(int i=0;i<maxSize;++i){
+            Real sum = 0.0;
+            if(i<coeffs.size()){
+                sum += coeffs[i];
+            }
+            if(i<rhs.coeffs.size()){
+                sum+=rhs.coeffs[i];
+            }
+            result.coeffs.push_back(sum);
+        }
+        return result;
+    }
+    Polynomial Polynomial::operator*(const Polynomial& rhs) const{
+        int resultSize = coeffs.size()+rhs.coeffs.size()-1;
+        Polynomial result;
+        if(coeffs.size()==0||rhs.coeffs.size()==0){
+            return result;
+        }
+        result.coeffs.resize(resultSize,0);
+        for(int i=0;i<coeffs.size();++i){
+            for(int j=0;j<rhs.coeffs.size();++j){
+                int dst = i+j;
+                result.coeffs[dst] += coeffs[i]*rhs.coeffs[j];
+            }
+        }
+        return result;
+    }
+    Polynomial Polynomial::operator*(Real rhs) const{
+        Polynomial result;
+        result = *this;
+        for(int i=0;i<result.coeffs.size();++i){
+            result.coeffs[i]*=rhs;
+        }
+        return result;
+    }
+    Polynomial operator*(Real lambda, const Polynomial &p)
+    {
+        return p*lambda;
+    }
+    Polynomial &Polynomial::operator=(const Polynomial &rhs)
+    {
+        coeffs.resize(rhs.coeffs.size());
+        for(int i=0;i<coeffs.size();++i){
+            coeffs[i] = rhs.coeffs[i];
+        }
+        return *this;
+    }
+    void Polynomial::printCoeffs()
+    {
+        int count = 0;
+        for(int i=0;i<coeffs.size();++i){
+            std::cout<<coeffs[i]<<",";
+             count=(count+1)%5;
+            if(count==0){
+                std::cout<<'\n';
+            }
+        }
+        std::cout<<'\n';
+    }
+    std::ostream &operator<<(std::ostream &os, const Polynomial &p)
+    {
+        int count = 1;
+        os<<p.coeffs[0];
+        for(int i=1;i<p.coeffs.size();++i){
+            os<<"+"<<p.coeffs[i]<<"x^"<<i;
+            count=(count+1)%5;
+            if(count==0){
+                os<<'\n';
+            }
+        }
+        os<<'\n';
+        return os;
+    }
+
+}
+namespace miniMath{
+    Polynomial LagrangeInterpolation(std::vector<Real>& xi,std::vector<Real>& yi){
+        if(xi.size()!=yi.size()){
+            throw std::runtime_error("xi and yi should be in same size!");
+        }
+        if(xi.size()<2){
+            std::runtime_error("xi/yi size should be greater than 1!");
+        }
+        int degree = xi.size()-1;
+        Polynomial result;
+        for(int i=0;i<=degree;++i){
+            Polynomial t{yi[i]};
+            for(int j=0;j<=degree;++j){
+                if(i!=j){
+                    t = t*Polynomial{-xi[j]/(xi[i]-xi[j]),1.0/(xi[i]-xi[j])};
+                }
+            }
+            result = result + t;
+        }
+        return result;
+    }
+    std::vector<Polynomial> CubeSplineInterpolation(std::vector<Real>& xi,std::vector<Real>& yi){
+        
+        if(xi.size()!=yi.size()){
+            throw std::runtime_error("xi and yi should be in same size!");
+        }
+        if(xi.size()<2){
+            std::runtime_error("xi/yi size should be greater than 1!");
+        }
+        int N = xi.size()-1;
+        Real df0 = 0.0;
+        Real dfn = 0.0;
+        std::vector<Real> hi;
+        std::vector<Real> di;
+        hi.resize(N+1,0.0);
+        di.resize(N+1,0.0);
+        for(int i=1;i<=N;++i){
+            hi[i] = xi[i] - xi[i-1];
+        }
+        //we use natural spline
+        di[0] = 0.0;
+        di[N] = 0.0;
+        for(int i=1;i<N;++i){
+            di[i] = 6.0*((yi[i+1]-yi[i])/hi[i+1] - (yi[i]-yi[i-1])/hi[i])/(hi[i]+hi[i+1]);
+        }
+        Vector d(N+1);
+        for(int i=0;i<=N;++i){
+            d.at(i) = di[i];
+        }
+        std::vector<Real> mii;
+        std::vector<Real> lambdai;
+        mii.resize(N+1,0.0);
+        lambdai.resize(N+1,0.0);
+        for(int i=0;i<N;++i){
+            lambdai[i] = hi[i+1]/(hi[i]+hi[i+1]);
+            mii[i] = 1.0 - lambdai[i];
+        }
+        Matrix A(N+1,N+1);
+        A.at(0,0) = 1;
+        for(int i=1;i<N;++i){
+            A.at(i,i-1) = mii[i];
+            A.at(i,i) = 2;
+            A.at(i,i+1) = lambdai[i];
+        }
+        A.at(N,N) = 1;
+        
+        //Gauss-Seidel convergence with Dominant main diagonal
+        Vector m = GSSolve(A,d);
+        std::vector<Polynomial> Polynomials; 
+        for(int i=1;i<=N;++i){
+            Polynomial Si;
+            Polynomial t1{xi[i],-1.0};
+            Polynomial t2{-xi[i-1],1.0};
+            Si = (m.at(i-1)/(6.0*hi[i]))*(t1*t1*t1) + (m.at(i)/(6.0*hi[i]))*(t2*t2*t2)
+                + (yi[i-1]-m.at(i-1)/6.0*hi[i]*hi[i])/hi[i]*t1 + (yi[i]-m.at(i)/6.0*hi[i]*hi[i])/hi[i]*t2;
+            Polynomials.push_back(Si);
+        }
+        return Polynomials;
+    }
 }
 #endif
