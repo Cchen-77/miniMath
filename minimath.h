@@ -54,14 +54,24 @@ namespace miniMath{
     };
 
     std::ostream& operator<<(std::ostream& os,Matrix& mat);
+    Matrix operator+(const Real& lhs,const Matrix& rhs);
+    Matrix operator+(const Matrix& lhs,const Real& rhs);
+    Matrix operator-(const Real& lhs,const Matrix& rhs);
+    Matrix operator-(const Matrix& lhs,const Real& rhs);
+    Matrix operator*(const Real& lhs,const Matrix& rhs);
+    Matrix operator*(const Matrix& lhs,const Real& rhs);
+    Matrix operator/(const Matrix& lhs,const Real& rhs);
 }
-//tier2 operators
 namespace miniMath{
+    Matrix transpose(const Matrix& mat);
     Real length(const Vector& vector);
+    Real dot(const Vector& lhs,const Vector& rhs);
 }
 //Solvers:
 namespace miniMath{
     void LUSplit(const Matrix& mat,Matrix& L,Matrix& U,Matrix& P,Matrix& invP);
+    void QRSplit_MSchmidt(const Matrix& mat,Matrix& Q,Matrix& R);
+    void QRSplit_HouseHolder(const Matrix& mat,Matrix& Q,Matrix& R);
     Vector JacobiSolve(const Matrix& A,const Vector& b,bool printInfo=false);
     Vector GSSolve(const Matrix& A,const Vector& b,bool printInfo=false);
     Vector SORSolve(const Matrix& A,const Vector& b,Real omega,bool printInfo=false);
@@ -219,7 +229,7 @@ namespace miniMath{
 
     Vector::Vector():Matrix()
     {
-
+        
     }
 
     Vector::Vector(uint32_t dim) : Matrix(dim, 1)
@@ -252,6 +262,80 @@ namespace miniMath{
         return os;
     }
 
+    Matrix operator+(const Real &lhs, const Matrix &rhs)
+    {
+        Matrix result = rhs;
+        for(int i=0;i<rhs.dim_0;++i){
+            for(int j=0;j<rhs.dim_1;++j){
+                result.at(i,j)+=lhs;
+            }
+        }
+        return result;
+    }
+    Matrix operator+(const Matrix &lhs, const Real &rhs)
+    {
+        Matrix result = lhs;
+        for(int i=0;i<lhs.dim_0;++i){
+            for(int j=0;j<lhs.dim_1;++j){
+                result.at(i,j)+=rhs;
+            }
+        }
+        return result;
+    }
+    Matrix operator-(const Real &lhs, const Matrix &rhs)
+    {
+        Matrix result = rhs;
+        for(int i=0;i<rhs.dim_0;++i){
+            for(int j=0;j<rhs.dim_1;++j){
+                result.at(i,j)-=lhs;
+            }
+        }
+        return result;
+    }
+    Matrix operator-(const Matrix &lhs, const Real &rhs)
+    {
+        Matrix result = lhs;
+        for(int i=0;i<lhs.dim_0;++i){
+            for(int j=0;j<lhs.dim_1;++j){
+                result.at(i,j)-=rhs;
+            }
+        }
+        return result;
+    }
+    Matrix operator*(const Real &lhs, const Matrix &rhs)
+    {
+        Matrix result = rhs;
+        for(int i=0;i<rhs.dim_0;++i){
+            for(int j=0;j<rhs.dim_1;++j){
+                result.at(i,j)*=lhs;
+            }
+        }
+        return result;
+    }
+    Matrix operator*(const Matrix &lhs, const Real &rhs)
+    {
+        Matrix result = lhs;
+        for(int i=0;i<lhs.dim_0;++i){
+            for(int j=0;j<lhs.dim_1;++j){
+                result.at(i,j)*=rhs;
+            }
+        }
+        return result;
+    }
+    Matrix operator/(const Matrix &lhs, const Real &rhs)
+    {
+        if(rhs==0){
+            throw std::runtime_error("matrix divide by zero!");
+        }
+        Matrix result = lhs;
+        for(int i=0;i<lhs.dim_0;++i){
+            for(int j=0;j<lhs.dim_1;++j){
+                result.at(i,j)/=rhs;
+            }
+        }
+        return result;
+    }
+
     MatrixInitializer::MatrixInitializer(Matrix& mat,uint32_t idx):matrix(mat),index(idx){
 
     }
@@ -265,6 +349,17 @@ namespace miniMath{
     }
 }
 namespace miniMath{
+    Matrix transpose(const Matrix &mat)
+    {
+        Matrix result(mat.dim_1,mat.dim_0);
+        for(int i=0;i<mat.dim_0;++i){
+            for(int j=0;j<mat.dim_1;++j){
+                result.at(j,i) = mat.at(i,j);
+            }
+        }
+        return result;
+    }
+
     Real length(const Vector& vector){
         if(vector.dim_1!=1){
             throw std::runtime_error("bad vector:maybe you should not give a matrix!");
@@ -275,8 +370,56 @@ namespace miniMath{
         }
         return sqrt(len);
     }
+    Real dot(const Vector &lhs, const Vector &rhs)
+    {
+        if(lhs.dim_0 != rhs.dim_0){
+            throw std::runtime_error("lhs vector should have same length with rhs vector!");
+        }
+        Real result = 0;
+        for(uint32_t i=0;i<lhs.dim_0;++i){
+            result += lhs.at(i)*rhs.at(i);
+        }
+        return result;
+    }
 }
 namespace miniMath{
+    void QRSplit_MSchmidt(const Matrix& mat,Matrix& Q,Matrix& R){
+        int N = mat.dim_1;
+        int M = mat.dim_0;
+        std::vector<Vector> a(N);
+        std::vector<Vector> e(N);
+        for(int i=0;i<N;++i){
+            a[i] = Vector(M);
+            for(int j=0;j<M;++j){
+                a[i].at(j) = mat.at(j,i);
+            }
+        }
+        R = Matrix(N,N);
+        for(int i=0;i<N;++i){
+            Real rii = length(a[i]);
+            R.at(i,i) = rii;
+            if(rii!=0){
+                e[i] = a[i]/rii;
+            }
+            else{
+                e[i] = a[i];
+            }
+            for(int j=1;j<N;++j){
+                Real rij = dot(e[i],a[j]);
+                a[j] = a[j] - rij*e[i];
+                R.at(i,j) = rij;
+            }
+        }
+        Q = Matrix(M,N);
+        for(int i=0;i<N;++i){
+            for(int j=0;j<M;++j){
+                Q.at(j,i) = e[i].at(j);
+            }
+        }
+    }
+    void QRSplit_HouseHolder(const Matrix& mat,Matrix& Q,Matrix& R){
+
+    }
     void LUSplit(const Matrix& mat,Matrix& L,Matrix& U,Matrix& P,Matrix& invP){
         if(mat.dim_0!=mat.dim_1){
             throw std::runtime_error("bad matrix A or bad vector b!");
